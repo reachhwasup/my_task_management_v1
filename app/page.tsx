@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
 import NewTaskModal from './components/NewTaskModal';
@@ -48,7 +48,7 @@ interface Task {
   subtasks: { id: string; title: string; is_completed: boolean }[];
 }
 
-export default function Dashboard() {
+function DashboardContent() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [spaceId, setSpaceId] = useState<string | null>(null);
@@ -723,5 +723,13 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center bg-gray-50 text-gray-400 animate-pulse">Loading Dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
