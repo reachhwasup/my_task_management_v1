@@ -82,7 +82,7 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
   const router = useRouter();
   const [columns, setColumns] = useState<StatusColumn[]>([]);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [statusToRename, setStatusToRename] = useState<{ id: string; label: string } | null>(null);
+  const [statusToRename, setStatusToRename] = useState<{ id: string; label: string; key?: string; color?: string; icon?: string; isVirtual?: boolean } | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -291,7 +291,7 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                 <span className="text-xs bg-white px-2.5 py-1 rounded-full text-gray-700 font-bold shadow-sm border border-gray-200">
                                   {getTasksByStatus(col.id).length}
                                 </span>
-                                {userPermission !== 'viewer' && !col.is_virtual && (
+                                {userPermission !== 'viewer' && (
                                   <div className="relative" ref={openDropdown === col.id ? dropdownRef : null}>
                                     <button
                                       onClick={() => setOpenDropdown(openDropdown === col.id ? null : col.id)}
@@ -304,22 +304,40 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                       <div className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border-2 border-gray-200 py-1 z-50 min-w-[200px]">
                                         <button
                                           onClick={async () => {
-                                            const { data } = await supabase
-                                              .from('workspace_statuses')
-                                              .select('id, status_label')
-                                              .eq('workspace_id', workspaceId)
-                                              .eq('status_key', col.id)
-                                              .single();
-                                            if (data) {
-                                              setStatusToRename({ id: data.id, label: data.status_label });
+                                            if (col.is_virtual) {
+                                              setStatusToRename({
+                                                id: '',
+                                                label: col.label,
+                                                icon: col.id === 'completed' ? 'check-circle' : 'circle',
+                                                color: col.id === 'completed' ? 'bg-green-50' : 'bg-gray-50',
+                                                key: col.id,
+                                                isVirtual: true
+                                              });
+                                            } else {
+                                              const { data } = await supabase
+                                                .from('workspace_statuses')
+                                                .select('id, status_label, color_class, icon_name')
+                                                .eq('workspace_id', workspaceId)
+                                                .eq('status_key', col.id)
+                                                .single();
+                                              if (data) {
+                                                setStatusToRename({
+                                                  id: data.id,
+                                                  label: data.status_label,
+                                                  key: col.id,
+                                                  color: data.color_class,
+                                                  icon: data.icon_name,
+                                                  isVirtual: false
+                                                });
+                                              }
                                             }
                                           }}
                                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
                                         >
                                           <Pencil size={14} />
-                                          Rename section
+                                          {col.is_virtual ? 'Customize section' : 'Rename section'}
                                         </button>
-                                        {!col.is_system && (
+                                        {!col.is_system && !col.is_virtual && (
                                           <button
                                             onClick={() => handleDeleteStatus(col.id)}
                                             className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
@@ -537,9 +555,16 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
       {statusToRename && (
         <RenameStatusModal
           statusId={statusToRename.id}
+          workspaceId={workspaceId}
+          statusKey={statusToRename.key || ''}
           currentLabel={statusToRename.label}
+          currentColor={statusToRename.color}
+          currentIcon={statusToRename.icon}
+          isVirtual={statusToRename.isVirtual}
           onClose={() => setStatusToRename(null)}
-          onRenamed={() => handleRenameStatus(statusToRename.id)}
+          onRenamed={() => {
+            handleRenameStatus(statusToRename.id || statusToRename.key || '');
+          }}
         />
       )}
     </>
