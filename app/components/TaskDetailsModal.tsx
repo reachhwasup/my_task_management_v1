@@ -13,6 +13,7 @@ interface Task {
   status: string;
   priority: string;
   due_date: string;
+  is_completed?: boolean;
   workspace_id: string;
   assignee_id?: string;
 }
@@ -121,22 +122,21 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
     setActivitiesLoading(false);
   }
 
-  async function handleStatusChange(newStatus: string) {
-    const oldStatus = status;
-    setStatus(newStatus);
+  async function handleCompletionToggle() {
+    const newIsCompleted = !task.is_completed;
 
-    // Update task status in database immediately
+    // Update task completion in database immediately
     const { error } = await supabase
       .from('tasks')
-      .update({ status: newStatus })
+      .update({ is_completed: newIsCompleted })
       .eq('id', task.id);
 
     if (error) {
-      console.error('Error updating status:', error);
-      alert('Error updating status: ' + error.message);
+      console.error('Error updating completion:', error);
+      alert('Error updating completion: ' + error.message);
     } else {
-      await logActivity('status_change', 'status', oldStatus, newStatus);
-      // Refresh the board to show task in new column
+      await logActivity(newIsCompleted ? 'task_completed' : 'task_uncompleted', 'is_completed', String(!newIsCompleted), String(newIsCompleted));
+      // Refresh the board to show task in new state
       onUpdate();
     }
   }
@@ -471,17 +471,14 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
         {/* HEADER */}
         <div className="px-6 py-4 border-b flex items-center gap-3 bg-gray-50">
           <button
-            onClick={async () => {
-              const newStatus = status === 'completed' ? 'not_started' : 'completed';
-              await handleStatusChange(newStatus);
-            }}
+            onClick={handleCompletionToggle}
             disabled={isReadOnly}
-            className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${status === 'completed'
-                ? 'bg-green-500 border-green-500 hover:bg-green-600'
-                : 'bg-white border-gray-300 hover:border-green-500'
+            className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${task.is_completed
+              ? 'bg-green-500 border-green-500 hover:bg-green-600'
+              : 'bg-white border-gray-300 hover:border-green-500'
               } disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer`}
           >
-            {status === 'completed' && (
+            {task.is_completed && (
               <CheckCircle size={16} className="text-white" strokeWidth={3} />
             )}
           </button>
@@ -489,7 +486,7 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
             value={title}
             onChange={e => setTitle(e.target.value)}
             disabled={isReadOnly}
-            className={`text-xl font-bold bg-transparent border-none focus:ring-0 flex-1 text-gray-800 placeholder-gray-400 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${status === 'completed' ? 'line-through text-gray-400' : ''
+            className={`text-xl font-bold bg-transparent border-none focus:ring-0 flex-1 text-gray-800 placeholder-gray-400 outline-none disabled:opacity-60 disabled:cursor-not-allowed ${task.is_completed ? 'line-through text-gray-400' : ''
               }`}
           />
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
@@ -508,8 +505,8 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${activeTab === tab.key
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
               {tab.icon}
@@ -539,7 +536,15 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
                   ) : (
                     <select
                       value={status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
+                      onChange={async (e) => {
+                        const newStatus = e.target.value;
+                        setStatus(newStatus);
+                        const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id);
+                        if (!error) {
+                          await logActivity('status_change', 'status', status, newStatus);
+                          onUpdate();
+                        }
+                      }}
                       className="text-sm border border-gray-300 rounded px-3 py-1 bg-white text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-medium"
                     >
                       <option value="not_started">NOT STARTED</option>

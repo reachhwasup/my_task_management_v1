@@ -29,6 +29,7 @@ interface Task {
   priority: string;
   description: string;
   due_date: string;
+  is_completed?: boolean;
   workspace_id: string;
   assignee_id?: string;
   assignee?: {
@@ -313,6 +314,7 @@ function DashboardContent() {
         .from('tasks')
         .select(`
           *,
+          is_completed,
           subtasks ( id, title, is_completed ),
           assignee:profiles!assignee_id ( username, firstname, lastname ),
           task_assignees ( profiles ( username, firstname, lastname ) )

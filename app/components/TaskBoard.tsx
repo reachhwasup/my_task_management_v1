@@ -16,6 +16,7 @@ interface Task {
   priority: string;
   description: string;
   due_date: string;
+  is_completed?: boolean;
   workspace_id: string;
   assignee_id?: string;
   assignee?: {
@@ -212,11 +213,6 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
   };
 
   const getTasksByStatus = (status: string) => {
-    // For non-completed columns, hide completed tasks
-    if (status !== 'completed') {
-      return tasks.filter(t => t.status === status && t.status !== 'completed');
-    }
-    // For completed column, show completed tasks
     return tasks.filter(t => t.status === status);
   };
 
@@ -238,13 +234,12 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
 
   const displayColumns = [...columns];
   missingStatuses.forEach(status => {
-    const isCompleted = status === 'completed';
     displayColumns.push({
       id: status,
       label: status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-      color: isCompleted ? 'bg-green-50' : 'bg-gray-50',
-      headerColor: isCompleted ? 'bg-green-200' : 'bg-gray-200',
-      icon: isCompleted ? <CheckCircle size={16} className="text-gray-700" /> : <Circle size={16} className="text-gray-700" />,
+      color: 'bg-gray-50',
+      headerColor: 'bg-gray-200',
+      icon: <Circle size={16} className="text-gray-700" />,
       is_system: true,
       is_virtual: true,
     });
@@ -374,7 +369,7 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                         {...provided.draggableProps}
                                         {...provided.dragHandleProps}
                                         onClick={() => router.push(`/t/${task.id}`)}
-                                        className={`bg-white p-4 rounded-xl shadow border-2 ${cardBorder} hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer active:cursor-grabbing group ${snapshot.isDragging ? 'rotate-2 shadow-2xl ring-4 ring-blue-400 z-50 scale-105' : ''} ${task.status === 'completed' ? 'opacity-60' : ''}`}
+                                        className={`bg-white p-4 rounded-xl shadow border-2 ${cardBorder} hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer active:cursor-grabbing group ${snapshot.isDragging ? 'rotate-2 shadow-2xl ring-4 ring-blue-400 z-50 scale-105' : ''} ${task.is_completed ? 'opacity-60' : ''}`}
                                         style={provided.draggableProps.style}
                                       >
                                         <div className="flex justify-between items-start mb-3">
@@ -402,30 +397,30 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                               e.stopPropagation();
                                               if (userPermission === 'viewer') return;
 
-                                              const newStatus = task.status === 'completed' ? 'not_started' : 'completed';
+                                              const newIsCompleted = !task.is_completed;
 
                                               // Update in database
                                               await supabase
                                                 .from('tasks')
-                                                .update({ status: newStatus })
+                                                .update({ is_completed: newIsCompleted })
                                                 .eq('id', task.id);
 
                                               // Update local state
                                               const updatedTasks = tasks.map(t =>
-                                                t.id === task.id ? { ...t, status: newStatus } : t
+                                                t.id === task.id ? { ...t, is_completed: newIsCompleted } : t
                                               );
                                               onTasksChange(updatedTasks);
                                             }}
-                                            className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${task.status === 'completed'
+                                            className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${task.is_completed
                                               ? 'bg-green-500 border-green-500 hover:bg-green-600'
                                               : 'bg-white border-gray-300 hover:border-green-500'
                                               } ${userPermission === 'viewer' ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                                           >
-                                            {task.status === 'completed' && (
+                                            {task.is_completed && (
                                               <CheckCircle size={12} className="text-white" strokeWidth={3} />
                                             )}
                                           </button>
-                                          <h4 className={`text-sm font-bold leading-snug line-clamp-2 ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-900'
+                                          <h4 className={`text-sm font-bold leading-snug line-clamp-2 ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-900'
                                             }`}>
                                             {task.title}
                                           </h4>
