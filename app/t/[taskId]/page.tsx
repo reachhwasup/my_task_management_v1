@@ -169,6 +169,7 @@ export default function TaskPage() {
   return (
     <TaskDetailsModal
       task={task}
+      workspaceId={task.workspace_id}
       onClose={handleClose}
       onUpdate={handleTaskUpdate}
       userPermission={userPermission}

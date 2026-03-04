@@ -55,12 +55,13 @@ interface ActivityItem {
 
 interface Props {
   task: Task;
+  workspaceId: string;
   onClose: () => void;
   onUpdate: () => void;
   userPermission: string;
 }
 
-export default function TaskDetailsModal({ task, onClose, onUpdate, userPermission }: Props) {
+export default function TaskDetailsModal({ task, workspaceId, onClose, onUpdate, userPermission }: Props) {
   const isReadOnly = userPermission === 'viewer';
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState('');
@@ -222,14 +223,17 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
     }
 
     // 4. Fetch Workspace Statuses for Dynamic Dropdown
-    if (task.workspace_id) {
-      const { data: statusesData } = await supabase
+    const actualWorkspaceId = workspaceId || task.workspace_id;
+    if (actualWorkspaceId) {
+      const { data: statusesData, error: statusesError } = await supabase
         .from('workspace_statuses')
         .select('id, status_key, status_label')
-        .eq('workspace_id', task.workspace_id)
+        .eq('workspace_id', actualWorkspaceId)
         .order('position', { ascending: true });
 
-      if (statusesData) {
+      if (statusesError) console.error('Error fetching statuses:', statusesError);
+
+      if (statusesData && statusesData.length > 0) {
         setColumns(
           statusesData.map(s => ({
             id: s.id,
@@ -237,7 +241,12 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
             label: s.status_label
           }))
         );
+      } else {
+        // Fallback if somehow there are no statuses or the query fails
+        setColumns([{ id: 'not_started', key: 'not_started', label: 'NOT STARTED' }]);
       }
+    } else {
+      console.log("No workspace ID available to fetch statuses from.");
     }
   }
 

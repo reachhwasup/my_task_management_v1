@@ -692,6 +692,7 @@ function DashboardContent() {
         {selectedTask && (
           <TaskDetailsModal
             task={selectedTask}
+            workspaceId={workspaceId!}
             onClose={() => setSelectedTask(null)}
             onUpdate={() => {
               if (workspaceId) fetchTasks(workspaceId, spaceId, folderId, listId);
