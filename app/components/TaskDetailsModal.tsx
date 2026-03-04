@@ -69,6 +69,7 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
   const [dueDate, setDueDate] = useState(task.due_date || '');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [columns, setColumns] = useState<{ id: string; label: string; key: string }[]>([]);
 
   // Subtask State
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -218,6 +219,25 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
       );
       console.log('Subtasks with profiles:', subtasksWithProfiles);
       setSubtasks(subtasksWithProfiles);
+    }
+
+    // 4. Fetch Workspace Statuses for Dynamic Dropdown
+    if (task.workspace_id) {
+      const { data: statusesData } = await supabase
+        .from('workspace_statuses')
+        .select('id, status_key, status_label')
+        .eq('workspace_id', task.workspace_id)
+        .order('position', { ascending: true });
+
+      if (statusesData) {
+        setColumns(
+          statusesData.map(s => ({
+            id: s.id,
+            key: s.status_key,
+            label: s.status_label
+          }))
+        );
+      }
     }
   }
 
@@ -547,10 +567,9 @@ export default function TaskDetailsModal({ task, onClose, onUpdate, userPermissi
                       }}
                       className="text-sm border border-gray-300 rounded px-3 py-1 bg-white text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-medium"
                     >
-                      <option value="not_started">NOT STARTED</option>
-                      <option value="in_progress">IN PROGRESS</option>
-                      <option value="pending">PENDING</option>
-                      <option value="completed">COMPLETED</option>
+                      {columns.map(col => (
+                        <option key={col.key} value={col.key}>{col.label.toUpperCase()}</option>
+                      ))}
                     </select>
                   )}
                 </div>
