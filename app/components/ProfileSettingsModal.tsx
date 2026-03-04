@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { X, Upload, Save, User } from 'lucide-react';
+import { X, Upload, Save, User, Shield } from 'lucide-react';
+import MfaSetup from './MfaSetup';
 
 interface ProfileSettingsModalProps {
   onClose: () => void;
@@ -44,7 +45,7 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
   async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true);
-      
+
       if (!event.target.files || event.target.files.length === 0) {
         throw new Error('You must select an image to upload.');
       }
@@ -76,7 +77,7 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
 
   async function handleSave() {
     setSaving(true);
-    
+
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -94,7 +95,7 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
       onUpdate();
       onClose();
     }
-    
+
     setSaving(false);
   }
 
@@ -106,7 +107,7 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
           <h2 className="text-xl font-bold text-gray-800">Profile Settings</h2>
@@ -116,7 +117,7 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Avatar Upload */}
           <div className="flex flex-col items-center">
             <div className="relative group">
@@ -178,7 +179,7 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
           </div>
 
           {/* Position */}
-          <div>
+          <div className="mb-6">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Position / Role</label>
             <input
               type="text"
@@ -187,6 +188,17 @@ export default function ProfileSettingsModal({ onClose, onUpdate }: ProfileSetti
               className="w-full border-2 border-gray-300 rounded-lg text-sm bg-white p-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900"
               placeholder="e.g. Software Engineer, Project Manager"
             />
+          </div>
+
+          <hr className="border-gray-200" />
+
+          {/* Security Section */}
+          <div className="pt-2">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <Shield size={20} className="text-blue-500" />
+              Security Settings
+            </h3>
+            <MfaSetup />
           </div>
         </div>
 
