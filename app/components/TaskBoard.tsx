@@ -42,6 +42,7 @@ interface StatusColumn {
   headerColor: string;
   icon: React.ReactNode;
   is_system: boolean;
+  is_virtual?: boolean;
 }
 
 interface Props {
@@ -166,14 +167,23 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
 
     // Handle column reordering
     if (type === 'COLUMN') {
-      const reorderedColumns = Array.from(columns);
+      const existingColIds = new Set(columns.map(c => c.id));
+      const missingStatuses = Array.from(new Set(tasks.map(t => t.status))).filter(s => !existingColIds.has(s));
+      const displayCols = [...columns];
+      missingStatuses.forEach(status => {
+        displayCols.push({ id: status, label: status, color: '', headerColor: '', icon: <Circle />, is_system: true, is_virtual: true });
+      });
+
+      const reorderedColumns = Array.from(displayCols);
       const [movedColumn] = reorderedColumns.splice(source.index, 1);
       reorderedColumns.splice(destination.index, 0, movedColumn);
 
-      setColumns(reorderedColumns);
+      // Filter back to only physical columns to save to DB
+      const physicalColumns = reorderedColumns.filter(c => !c.is_virtual);
+      setColumns(physicalColumns);
 
       // Update positions in database
-      const updates = reorderedColumns.map((col, index) =>
+      const updates = physicalColumns.map((col, index) =>
         supabase
           .from('workspace_statuses')
           .update({ position: index + 1 })
@@ -223,6 +233,23 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
     });
   };
 
+  const existingColIds = new Set(columns.map(c => c.id));
+  const missingStatuses = Array.from(new Set(tasks.map(t => t.status))).filter(s => !existingColIds.has(s));
+
+  const displayColumns = [...columns];
+  missingStatuses.forEach(status => {
+    const isCompleted = status === 'completed';
+    displayColumns.push({
+      id: status,
+      label: status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+      color: isCompleted ? 'bg-green-50' : 'bg-gray-50',
+      headerColor: isCompleted ? 'bg-green-200' : 'bg-gray-200',
+      icon: isCompleted ? <CheckCircle size={16} className="text-gray-700" /> : <Circle size={16} className="text-gray-700" />,
+      is_system: true,
+      is_virtual: true,
+    });
+  });
+
   return (
     <>
       <DragDropContext onDragEnd={onDragEnd}>
@@ -233,8 +260,8 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
               ref={columnsProvided.innerRef}
               {...columnsProvided.droppableProps}
             >
-              {columns.map((col, colIndex) => (
-                <Draggable key={col.id} draggableId={`column-${col.id}`} index={colIndex} isDragDisabled={userPermission === 'viewer'}>
+              {displayColumns.map((col, colIndex) => (
+                <Draggable key={col.id} draggableId={`column-${col.id}`} index={colIndex} isDragDisabled={userPermission === 'viewer' || col.is_virtual}>
                   {(columnProvided, columnSnapshot) => (
                     <div
                       ref={columnProvided.innerRef}
@@ -251,7 +278,7 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                             {/* Header */}
                             <div className={`flex items-center justify-between mb-4 pb-3 border-b-2 border-gray-200 ${col.headerColor} -mx-4 px-4 -mt-4 pt-4 rounded-t-xl relative`}>
                               <div className="flex items-center gap-2">
-                                {userPermission !== 'viewer' && (
+                                {userPermission !== 'viewer' && !col.is_virtual && (
                                   <div {...columnProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
                                     <GripVertical size={16} />
                                   </div>
@@ -264,7 +291,7 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                 <span className="text-xs bg-white px-2.5 py-1 rounded-full text-gray-700 font-bold shadow-sm border border-gray-200">
                                   {getTasksByStatus(col.id).length}
                                 </span>
-                                {userPermission !== 'viewer' && (
+                                {userPermission !== 'viewer' && !col.is_virtual && (
                                   <div className="relative" ref={openDropdown === col.id ? dropdownRef : null}>
                                     <button
                                       onClick={() => setOpenDropdown(openDropdown === col.id ? null : col.id)}
@@ -334,8 +361,8 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                       >
                                         <div className="flex justify-between items-start mb-3">
                                           <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold shadow-sm ${task.priority === 'P1' ? 'bg-red-500 text-white' :
-                                              task.priority === 'P2' ? 'bg-orange-500 text-white' :
-                                                'bg-gray-400 text-white'
+                                            task.priority === 'P2' ? 'bg-orange-500 text-white' :
+                                              'bg-gray-400 text-white'
                                             }`}>
                                             {task.priority}
                                           </span>
@@ -372,8 +399,8 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                               onTasksChange(updatedTasks);
                                             }}
                                             className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${task.status === 'completed'
-                                                ? 'bg-green-500 border-green-500 hover:bg-green-600'
-                                                : 'bg-white border-gray-300 hover:border-green-500'
+                                              ? 'bg-green-500 border-green-500 hover:bg-green-600'
+                                              : 'bg-white border-gray-300 hover:border-green-500'
                                               } ${userPermission === 'viewer' ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                                           >
                                             {task.status === 'completed' && (
@@ -446,16 +473,16 @@ export default function TaskBoard({ tasks, workspaceId, onTasksChange, onAddTask
                                             {task.subtasks.map((subtask) => (
                                               <div key={subtask.id} className="flex items-center gap-2 text-xs">
                                                 <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center shrink-0 ${subtask.is_completed
-                                                    ? 'bg-green-500 border-green-500'
-                                                    : 'bg-white border-gray-300'
+                                                  ? 'bg-green-500 border-green-500'
+                                                  : 'bg-white border-gray-300'
                                                   }`}>
                                                   {subtask.is_completed && (
                                                     <CheckCircle size={10} className="text-white" strokeWidth={3} />
                                                   )}
                                                 </div>
                                                 <span className={`${subtask.is_completed
-                                                    ? 'line-through text-gray-400'
-                                                    : 'text-gray-700'
+                                                  ? 'line-through text-gray-400'
+                                                  : 'text-gray-700'
                                                   }`}>
                                                   {subtask.title}
                                                 </span>
